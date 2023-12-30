@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1174</width>
-    <height>809</height>
+    <height>854</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -164,6 +164,25 @@
         </widget>
        </item>
        <item>
+        <widget class="PushButton" name="PushButton_13">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>50</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>载入J值</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="PushButton" name="PushButton_2">
          <property name="minimumSize">
           <size>
@@ -248,8 +267,29 @@
     </item>
     <item row="2" column="1">
      <widget class="CardWidget" name="CardWidget_3">
-      <layout class="QVBoxLayout" name="verticalLayout_4">
-       <item>
+      <layout class="QGridLayout" name="gridLayout_2">
+       <item row="1" column="3">
+        <widget class="SpinBox" name="SpinBox">
+         <property name="maximum">
+          <number>300</number>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>起始日期：</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>年份长度：</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0" colspan="4">
         <widget class="TextEdit" name="TextEdit">
          <property name="font">
           <font>
@@ -259,6 +299,9 @@
           </font>
          </property>
         </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="ZhDatePicker" name="ZhDatePicker"/>
        </item>
       </layout>
      </widget>
@@ -350,6 +393,16 @@ background-color: rgb(85, 170, 255);</string>
    <container>1</container>
   </customwidget>
   <customwidget>
+   <class>DatePicker</class>
+   <extends>QPushButton</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>ZhDatePicker</class>
+   <extends>DatePicker</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
    <class>DisplayLabel</class>
    <extends>QLabel</extends>
    <header>qfluentwidgets</header>
@@ -357,6 +410,11 @@ background-color: rgb(85, 170, 255);</string>
   <customwidget>
    <class>TextEdit</class>
    <extends>QTextEdit</extends>
+   <header>qfluentwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>SpinBox</class>
+   <extends>QSpinBox</extends>
    <header>qfluentwidgets</header>
   </customwidget>
   <customwidget>

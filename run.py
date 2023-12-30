@@ -33,7 +33,7 @@ def tk(t):
 
 #出射净长波辐射
 def rnl(c,tmax,tmin,ea,rs,rs0):
-    rnl = c*((pow(tmax,4)-pow(tmin,4))/4)*(0.34 - 0.14*pow(ea,0.5))*(1.35*rs/rs0 - 0.35)
+    rnl = c*((pow(tmax,4)-pow(tmin,4))/2)*(0.34 - 0.14*pow(ea,0.5))*(1.35*rs/rs0 - 0.35)
     return rnl
 
 #入射净短波辐射计算
@@ -84,10 +84,14 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         super(Form_waterinf, self).__init__()
         self.setupUi(self)
         self.setObjectName("solar_energy")
+        self.inin_shuxing()
         self.handlebutton()
         self.ininitialize()
         self.year_runoff = []
         self.time_series = []
+
+    def inin_shuxing(self):
+        self.ZhDatePicker.setDate(QDate.currentDate())
 
     def ininitialize(self):
         self.PushButton_2.setEnabled(False)
@@ -104,12 +108,16 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         self.PushButton_10.clicked.connect(self.add_data)
         self.PushButton_11.clicked.connect(self.add_data)
         self.PushButton_12.clicked.connect(self.add_data)
+        self.PushButton_13.clicked.connect(self.add_data)
         # self.PushButton_12.clicked.connect(self.test_def)
         # self.PushButton_2.clicked.connect(self.mk_test_mutation)
         # self.PushButton_3.clicked.connect(self.pettitt_test)
         # self.PushButton_4.clicked.connect(self.agglomerative)
         # self.PushButton_5.clicked.connect(self.contive_analysis)
         self.PushButton_6.clicked.connect(self.call_author)
+        self.PushButton_2.clicked.connect(self.calculate_solar_energy)
+        self.PushButton_3.clicked.connect(self.calculate_stability)
+
 
     #解除按钮限制
     def deal_button(self):
@@ -120,8 +128,9 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
 
     # 测试函数
     def test_def(self):
-        clicked_button_text = self.sender().text()
-        print(f'Button clicked: {clicked_button_text}')
+        # clicked_button_text = self.sender().text()
+        # print(f'Button clicked: {clicked_button_text}')
+        self.statusBar().showMessage("test")
     #导入数据
     def add_data(self):
         fname, _ = QFileDialog.getOpenFileName(self, "打开文件", '.', '数据文件(*.txt)')
@@ -140,8 +149,12 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
                 self.df_weidu = df
             if clicked_button_text == '载入日照时数':
                 self.df_sun = df
+                self.SpinBox.setValue(int(len(self.df_sun.iloc[:,0])/365))
+
             if clicked_button_text == '载入湿度':
                 self.df_rhu = df
+            if clicked_button_text == '载入J值':
+                self.df_j = df
             data = df.values
             # 表格加载数据
             # 设置行列，设置表头
@@ -156,6 +169,190 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
             for row, form in enumerate(data):
                 for column, item in enumerate(form):
                     self.TableWidget.setItem(row, column, QTableWidgetItem(str(item)))
+
+    #计算太阳辐射
+    def calculate_solar_energy(self):
+
+        self.statusBar().showMessage("正在计算太阳辐射，请勿操作！")
+        row_lst = []
+        col_lst = []
+        for row in self.df_weidu.index.values:
+            col_lst = []
+            for col in self.df_weidu.columns.values:
+                tmp_value = N(self.df_weidu.loc[row, col], self.df_j.loc[row, col])
+                col_lst.append(tmp_value)
+            row_lst.append(col_lst)
+        self.df_n = pd.DataFrame(row_lst)
+        self.df_n.index = self.df_rhu.index
+        self.df_n.columns = self.df_rhu.columns
+
+        # 温度单位转换
+        df_tmax = self.df_tmax / 10
+        df_tmin = self.df_tmin / 10
+        df_tmean = self.df_tmean / 10
+
+        # 计算相对湿度
+        row_lst = []
+        col_lst = []
+        for row in self.df_rhu.index.values:
+            col_lst = []
+            for col in self.df_rhu.columns.values:
+                tmp_value = ea(self.df_rhu.loc[row, col], self.df_tmean.loc[row, col],
+                               self.df_tmax.loc[row, col], self.df_tmin.loc[row, col])
+                col_lst.append(tmp_value)
+            row_lst.append(col_lst)
+        self.df_ea = pd.DataFrame(row_lst)
+        self.df_ea.index = self.df_rhu.index
+        self.df_ea.columns = self.df_rhu.columns
+
+        # 计算大气层顶太阳辐射ra
+        row_lst = []
+        col_lst = []
+        for row in self.df_weidu.index.values:
+            col_lst = []
+            for col in self.df_weidu.columns.values:
+                tmp_value = ra(self.df_weidu.loc[row, col], self.df_j.loc[row, col])
+                col_lst.append(tmp_value)
+            row_lst.append(col_lst)
+        self.df_ra = pd.DataFrame(row_lst)
+        self.df_ra.index = self.df_rhu.index
+        self.df_ra.columns = self.df_rhu.columns
+
+        # 计算晴空辐射rs0
+        row_lst = []
+        col_lst = []
+        for row in self.df_weidu.index.values:
+            col_lst = []
+            for col in self.df_weidu.columns.values:
+                tmp_value = rs0(self.df_height.loc[row, col], self.df_ra.loc[row, col])
+                col_lst.append(tmp_value)
+            row_lst.append(col_lst)
+        self.df_rs0 = pd.DataFrame(row_lst)
+        self.df_rs0.index = self.df_rhu.index
+        self.df_rs0.columns = self.df_rhu.columns
+
+        # 太阳短波辐射rs
+        row_lst = []
+        col_lst = []
+        for row in self.df_weidu.index.values:
+            col_lst = []
+            for col in self.df_weidu.columns.values:
+                tmp_value = rs(self.df_sun.loc[row, col], self.df_n.loc[row, col], self.df_ra.loc[row, col])
+                col_lst.append(tmp_value)
+            row_lst.append(col_lst)
+        self.df_rs = pd.DataFrame(row_lst)
+        self.df_rs.index = self.df_rhu.index
+        self.df_rs.columns = self.df_rhu.columns
+
+        # 入射净短波辐射rns
+        row_lst = []
+        col_lst = []
+        for row in self.df_weidu.index.values:
+            col_lst = []
+            for col in self.df_weidu.columns.values:
+                tmp_value = rns(self.df_rs.loc[row, col])
+                col_lst.append(tmp_value)
+            row_lst.append(col_lst)
+        self.df_rns = pd.DataFrame(row_lst)
+        self.df_rns.index = self.df_rhu.index
+        self.df_rns.columns = self.df_rhu.columns
+
+        # 出射净长波辐射rnl
+        row_lst = []
+        col_lst = []
+        # c 为Stefan-Boltzmann常数
+        c = 4.903 * pow(10, -9)
+        for row in self.df_weidu.index.values:
+            col_lst = []
+            for col in self.df_weidu.columns.values:
+                tmp_value = rnl(c, self.df_tmax.loc[row, col], self.df_tmin.loc[row, col],
+                                self.df_ea.loc[row, col], self.df_rs.loc[row, col],
+                                self.df_rs0.loc[row, col])
+                col_lst.append(tmp_value)
+            row_lst.append(col_lst)
+        self.df_rnl = pd.DataFrame(row_lst)
+        self.df_rnl.index = self.df_rhu.index
+        self.df_rnl.columns = self.df_rhu.columns
+
+        # 地表净辐射rn
+        self.df_rn = self.df_rns - self.df_rnl
+        self.df_rn = self.df_rn.round(2)
+
+        data = self.df_rn.values
+        # 表格加载数据
+        # 设置行列，设置表头
+        tmp = self.df_rn.columns
+        tmp2 = [str(_) for _ in self.df_rn.index.tolist()]
+        self.TableWidget.setRowCount(len(data))
+        self.TableWidget.setColumnCount(len(data[0]))
+        self.TableWidget.setHorizontalHeaderLabels(tmp)
+        self.TableWidget.setVerticalHeaderLabels(tmp2)
+        # 表格加载内容
+        for row, form in enumerate(data):
+            for column, item in enumerate(form):
+                self.TableWidget.setItem(row, column, QTableWidgetItem(str(item)))
+        self.statusBar().showMessage(" ")
+
+    #计算太阳能资源稳定度
+    def calculate_stability(self):
+        # date_str = self.ZhDatePicker.date().toString('yyyy-MM-dd')
+        date_str = self.ZhDatePicker.getDate().toString('yyyy-MM-dd')
+        print(date_str)
+
+        prod = int(self.SpinBox.text())*12
+
+        empty = len(self.df_sun.iloc[:,0])
+
+        # 计算每列的空值数量
+        null_counts = self.df_sun.isnull().sum()
+
+        # 获取空值大于 1000 的列名
+        columns_to_drop = null_counts[null_counts > empty].index
+
+        # 删除对应的列
+        df_filtered = self.df_sun.drop(columns=columns_to_drop)
+        print(df_filtered)
+
+        # 根据年份和月份分组，然后对每列应用 lambda 函数统计大于 60 的个数
+        df_filtered.index = pd.to_datetime(df_filtered.index)
+        result = df_filtered.groupby([df_filtered.index.year, df_filtered.index.month]).apply(lambda x: (x > 60).sum())
+        result = pd.DataFrame(result.values)
+        result.columns = df_filtered.columns
+        result.index = pd.date_range(start=date_str, periods=prod, freq='M')
+
+        # 按照年份分组，然后计算各列每年的最大值
+        yearly_max_values = result.groupby(result.index.year).max()
+        # 按照年份分组，然后计算各列每年的最小值
+        yearly_min_values = result.groupby(result.index.year).min()
+        stability = yearly_max_values / yearly_min_values
+
+        second_result = df_filtered.groupby(df_filtered.index.month).apply(lambda x: (x > 60).sum())
+
+        second_result_max = second_result.max()
+        second_result_min = second_result.min()
+        second_stability = second_result_max / second_result_min
+        second_stability = second_stability.round(2)
+        second_stability = pd.DataFrame(second_stability)
+        second_stability.columns = ["stability"]
+
+        data = second_stability.values
+        # 表格加载数据
+        # 设置行列，设置表头
+        tmp = second_stability.columns
+        tmp2 = [str(_) for _ in second_stability.index.tolist()]
+        self.TableWidget.setRowCount(len(data))
+        self.TableWidget.setColumnCount(len(data[0]))
+        self.TableWidget.setHorizontalHeaderLabels(tmp)
+        self.TableWidget.setVerticalHeaderLabels(tmp2)
+        # 表格加载内容
+        for row, form in enumerate(data):
+            for column, item in enumerate(form):
+                self.TableWidget.setItem(row, column, QTableWidgetItem(str(item)))
+
+
+
+
+
 
 
     #联系作者
