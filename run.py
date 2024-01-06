@@ -15,12 +15,67 @@ import time
 import pandas as pd
 import math
 from matplotlib import pyplot as plt
+from scipy.stats import linregress
 from ui.solar_energy import Ui_MainWindow
 
 plt.rcParams['font.sans-serif'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
 
+# 进行线性回归分析
+def linear_regression(time_series, runoff_data):
+    # time_series年份输入，runoff_data年均径流输入
+
+    slope, intercept, r_value, p_value, std_err = linregress(time_series, runoff_data)
+    return slope, intercept, r_value, p_value, std_err
+#mk突变分析
+def Kendall_change_point_detection(index,inputdata):
+    inputdata = np.array(inputdata)
+    n=inputdata.shape[0]
+    Sk = [0]
+    UFk = [0]
+    s =  0
+    Exp_value = [0]
+    Var_value = [0]
+    for i in range(1,n):
+        for j in range(i):
+            if inputdata[i] > inputdata[j]:
+                s = s+1
+            else:
+                s = s+0
+        Sk.append(s)
+        Exp_value.append((i+1)*(i+2)/4 )                     # Sk[i]的均值
+        Var_value.append((i+1)*i*(2*(i+1)+5)/72 )            # Sk[i]的方差
+        UFk.append((Sk[i]-Exp_value[i])/np.sqrt(Var_value[i]))
+    Sk2 = [0]
+    UBk = [0]
+    UBk2 = [0]
+    # s归0
+    s2 =  0
+    Exp_value2 = [0]
+    Var_value2 = [0]
+    # 按时间序列逆转样本y
+    inputdataT = list(reversed(inputdata))
+    for i in range(1,n):
+        for j in range(i):
+            if inputdataT[i] > inputdataT[j]:
+                s2 = s2+1
+            else:
+                s2 = s2+0
+        Sk2.append(s2)
+        Exp_value2.append((i+1)*(i+2)/4 )                     # Sk[i]的均值
+        Var_value2.append((i+1)*i*(2*(i+1)+5)/72 )            # Sk[i]的方差
+        UBk.append((Sk2[i]-Exp_value2[i])/np.sqrt(Var_value2[i]))
+        UBk2.append(-UBk[i])
+    UBkT = list(reversed(UBk2))
+    diff = np.array(UFk) - np.array(UBkT)
+    K    = list()
+    # 找出交叉点
+    for k in range(1,n):
+        if diff[k-1]*diff[k]<0:
+            K.append(k)
+
+    return K,UFk,UBkT
 #地表净辐射计算
 def rn(rns,rnl):
     rn = rns - rnl
@@ -117,6 +172,9 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         self.PushButton_6.clicked.connect(self.call_author)
         self.PushButton_2.clicked.connect(self.calculate_solar_energy)
         self.PushButton_3.clicked.connect(self.calculate_stability)
+        self.PushButton_4.clicked.connect(self.trend_analysis)
+        self.PushButton_5.clicked.connect(self.mutation_analysis)
+
 
 
     #解除按钮限制
@@ -124,7 +182,7 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         self.PushButton_2.setEnabled(True)
         self.PushButton_3.setEnabled(True)
         self.PushButton_4.setEnabled(True)
-        # self.PushButton_5.setEnabled(True)
+        self.PushButton_5.setEnabled(True)
 
     # 测试函数
     def test_def(self):
@@ -297,7 +355,7 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
     def calculate_stability(self):
         # date_str = self.ZhDatePicker.date().toString('yyyy-MM-dd')
         date_str = self.ZhDatePicker.getDate().toString('yyyy-MM-dd')
-        print(date_str)
+        # print(date_str)
 
         prod = int(self.SpinBox.text())*12
 
@@ -311,7 +369,7 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
 
         # 删除对应的列
         df_filtered = self.df_sun.drop(columns=columns_to_drop)
-        print(df_filtered)
+        # print(df_filtered)
 
         # 根据年份和月份分组，然后对每列应用 lambda 函数统计大于 60 的个数
         df_filtered.index = pd.to_datetime(df_filtered.index)
@@ -324,6 +382,11 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         yearly_max_values = result.groupby(result.index.year).max()
         # 按照年份分组，然后计算各列每年的最小值
         yearly_min_values = result.groupby(result.index.year).min()
+
+        self.yearly_mean_values = result.groupby(result.index.year).mean()
+        # print(self.yearly_mean_values)
+        self.yearly_mean_values.to_csv("./data/年均量.txt")
+
         stability = yearly_max_values / yearly_min_values
 
         second_result = df_filtered.groupby(df_filtered.index.month).apply(lambda x: (x > 60).sum())
@@ -348,6 +411,30 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         for row, form in enumerate(data):
             for column, item in enumerate(form):
                 self.TableWidget.setItem(row, column, QTableWidgetItem(str(item)))
+
+    #趋势分析
+    def trend_analysis(self):
+
+        time_series = self.yearly_mean_values.index
+        for i in range(len(self.yearly_mean_values.columns)):
+            runoff_data = self.yearly_mean_values.iloc[:,i].values
+            slope, intercept, r_value, p_value, std_err = linear_regression(time_series, runoff_data)
+            # print(slope, intercept)
+            # 返回值
+
+
+
+
+
+    #突变分析
+    def mutation_analysis(self):
+        time_series = self.yearly_mean_values.index
+        for i in range(len(self.yearly_mean_values.columns)):
+            year_runoff = self.yearly_mean_values.iloc[:,i].values
+            k, UFk, UBkT = Kendall_change_point_detection(time_series, year_runoff)
+            # print(k, UFk, UBkT)
+            #返回三个列表
+
 
 
 
