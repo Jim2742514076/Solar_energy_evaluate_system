@@ -163,11 +163,20 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         self.PushButton_2.setEnabled(False)
         self.PushButton_3.setEnabled(False)
         self.PushButton_4.setEnabled(False)
-        # self.PushButton_5.setEnabled(False)
+        self.PushButton_7.setEnabled(False)
+        self.PushButton_8.setEnabled(False)
+        self.PushButton_9.setEnabled(False)
+        self.PushButton_10.setEnabled(False)
+        self.PushButton_11.setEnabled(False)
+        self.PushButton_12.setEnabled(False)
+        self.PushButton_13.setEnabled(False)
+        self.PushButton_5.setEnabled(False)
+        self.PushButton_16.setEnabled(False)
+        self.PushButton_17.setEnabled(False)
 
     def handlebutton(self):
         self.PushButton.clicked.connect(self.add_data)
-        self.PushButton.clicked.connect(self.deal_button)
+        # self.PushButton.clicked.connect(self.deal_button)
         self.PushButton_7.clicked.connect(self.add_data)
         self.PushButton_8.clicked.connect(self.add_data)
         self.PushButton_9.clicked.connect(self.add_data)
@@ -176,11 +185,6 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         self.PushButton_12.clicked.connect(self.add_data)
         self.PushButton_13.clicked.connect(self.add_data)
         self.PushButton_15.clicked.connect(self.add_data)
-        # self.PushButton_12.clicked.connect(self.test_def)
-        # self.PushButton_2.clicked.connect(self.mk_test_mutation)
-        # self.PushButton_3.clicked.connect(self.pettitt_test)
-        # self.PushButton_4.clicked.connect(self.agglomerative)
-        # self.PushButton_5.clicked.connect(self.contive_analysis)
         self.PushButton_6.clicked.connect(self.call_author)
         self.PushButton_2.clicked.connect(self.calculate_solar_energy)
         self.PushButton_3.clicked.connect(self.calculate_stability)
@@ -212,23 +216,33 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
             df = pd.read_csv(fname, index_col=0)
             if clicked_button_text == '载入高程':
                 self.df_height = df
+                self.PushButton_11.setEnabled(True)
             if clicked_button_text == '载入平均气温':
                 self.df_tmean = df
+                self.PushButton_8.setEnabled(True)
             if clicked_button_text == '载入最高气温':
                 self.df_tmax = df
+                self.PushButton_9.setEnabled(True)
             if clicked_button_text == '载入最低气温':
                 self.df_tmin = df
+                self.PushButton_10.setEnabled(True)
             if clicked_button_text == '载入纬度':
                 self.df_weidu = df
+                self.PushButton_7.setEnabled(True)
             if clicked_button_text == '载入日照时数':
                 self.df_sun = df
-
+                self.PushButton_12.setEnabled(True)
             if clicked_button_text == '载入湿度':
                 self.df_rhu = df
+                self.PushButton_13.setEnabled(True)
             if clicked_button_text == '载入J值':
                 self.df_j = df
+                self.PushButton_2.setEnabled(True)
+
             if clicked_button_text == '载入年均辐射':
                 self.df_avg = df
+                self.PushButton_16.setEnabled(True)
+                self.PushButton_17.setEnabled(True)
 
             self.SpinBox.setValue(int(len(df.iloc[:, 0]) / 365))
             if is_valid_date(str(df.index[0])):
@@ -374,6 +388,7 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
             for column, item in enumerate(form):
                 self.TableWidget.setItem(row, column, QTableWidgetItem(str(item)))
         self.statusBar().showMessage(" ")
+        self.PushButton_3.setEnabled(True)
 
     #计算太阳能资源稳定度
     def calculate_stability(self):
@@ -435,6 +450,10 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         for row, form in enumerate(data):
             for column, item in enumerate(form):
                 self.TableWidget.setItem(row, column, QTableWidgetItem(str(item)))
+
+
+        self.PushButton_4.setEnabled(True)
+        self.PushButton_5.setEnabled(True)
 
     #趋势分析
     def trend_analysis(self):
@@ -515,14 +534,10 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         # 保存数据
         path = QFileDialog.getSaveFileName(self, "保存文件", "./", ("结果(*.xlsx)"))
         if path:
-            # 创建Excel写入器对象
-            writer = pd.ExcelWriter('output.xlsx')
-            # 将第一个DataFrame保存为Sheet1
-            result_lst.to_excel(writer, sheet_name='Ufk_ubk', index=False)
-            # 将第二个DataFrame保存为Sheet2
-            result_k.to_excel(writer, sheet_name='突变年份', index=False)
-            # 关闭Excel写入器并保存文件
-            writer.save()
+            # 使用 ExcelWriter 写入两个数据框到同一个文件
+            with pd.ExcelWriter(path[0]) as writer:
+                result_lst.to_excel(writer, sheet_name='Ufk_ubk', index=True)
+                result_k.to_excel(writer, sheet_name='突变年份', index=True)
 
     #年均趋势分析
     def avg_trend_analysis(self):
@@ -603,14 +618,10 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         # 保存数据
         path = QFileDialog.getSaveFileName(self, "保存文件", "./", ("结果(*.xlsx)"))
         if path:
-            # 创建Excel写入器对象
-            writer = pd.ExcelWriter('output.xlsx')
-            # 将第一个DataFrame保存为Sheet1
-            result_lst.to_excel(writer, sheet_name='Ufk_ubk', index=False)
-            # 将第二个DataFrame保存为Sheet2
-            result_k.to_excel(writer, sheet_name='突变年份', index=False)
-            # 关闭Excel写入器并保存文件
-            writer.save()
+            # 使用 ExcelWriter 写入两个数据框到同一个文件
+            with pd.ExcelWriter(path[0]) as writer:
+                result_lst.to_excel(writer, sheet_name='Ufk_ubk', index=True)
+                result_k.to_excel(writer, sheet_name='突变年份', index=True)
 
     def showDialog(self):
         title = '弹窗警告'
