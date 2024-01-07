@@ -16,6 +16,7 @@ import pandas as pd
 import math
 from matplotlib import pyplot as plt
 from scipy.stats import linregress
+import re
 from ui.solar_energy import Ui_MainWindow
 
 plt.rcParams['font.sans-serif'] = ['SimHei']
@@ -76,6 +77,16 @@ def Kendall_change_point_detection(index,inputdata):
             K.append(k)
 
     return K,UFk,UBkT
+
+#判断是否为日期格式，确定是否需要手动校正日期
+def is_valid_date(input_str):
+    pattern = r'^\d{4}-\d{2}-\d{2}$'  # 定义日期格式的正则表达式
+
+    if re.match(pattern, input_str):
+        return True
+    else:
+        return False
+
 #地表净辐射计算
 def rn(rns,rnl):
     rn = rns - rnl
@@ -164,6 +175,7 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         self.PushButton_11.clicked.connect(self.add_data)
         self.PushButton_12.clicked.connect(self.add_data)
         self.PushButton_13.clicked.connect(self.add_data)
+        self.PushButton_15.clicked.connect(self.add_data)
         # self.PushButton_12.clicked.connect(self.test_def)
         # self.PushButton_2.clicked.connect(self.mk_test_mutation)
         # self.PushButton_3.clicked.connect(self.pettitt_test)
@@ -174,6 +186,8 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         self.PushButton_3.clicked.connect(self.calculate_stability)
         self.PushButton_4.clicked.connect(self.trend_analysis)
         self.PushButton_5.clicked.connect(self.mutation_analysis)
+        self.PushButton_16.clicked.connect(self.avg_trend_analysis)
+        self.PushButton_17.clicked.connect(self.avg_mutation_analysis)
 
 
 
@@ -189,6 +203,7 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
         # clicked_button_text = self.sender().text()
         # print(f'Button clicked: {clicked_button_text}')
         self.statusBar().showMessage("test")
+
     #导入数据
     def add_data(self):
         fname, _ = QFileDialog.getOpenFileName(self, "打开文件", '.', '数据文件(*.txt)')
@@ -207,12 +222,21 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
                 self.df_weidu = df
             if clicked_button_text == '载入日照时数':
                 self.df_sun = df
-                self.SpinBox.setValue(int(len(self.df_sun.iloc[:,0])/365))
 
             if clicked_button_text == '载入湿度':
                 self.df_rhu = df
             if clicked_button_text == '载入J值':
                 self.df_j = df
+            if clicked_button_text == '载入年均辐射':
+                self.df_avg = df
+
+            self.SpinBox.setValue(int(len(df.iloc[:, 0]) / 365))
+            if is_valid_date(str(df.index[0])):
+                qdate = QDate.fromString(df.index[0], 'yyyy-MM-dd')
+                self.ZhDatePicker.setDate(qdate)
+            else:
+                self.showDialog()
+
             data = df.values
             # 表格加载数据
             # 设置行列，设置表头
@@ -416,31 +440,187 @@ class Form_waterinf(QMainWindow,Ui_MainWindow):
     def trend_analysis(self):
 
         time_series = self.yearly_mean_values.index
+        lst = []
         for i in range(len(self.yearly_mean_values.columns)):
             runoff_data = self.yearly_mean_values.iloc[:,i].values
             slope, intercept, r_value, p_value, std_err = linear_regression(time_series, runoff_data)
-            # print(slope, intercept)
-            # 返回值
+            lst.append([slope.round(5), intercept.round(5),r_value.round(5), p_value.round(5), std_err.round(5)])
+        trend_df = pd.DataFrame(lst,index=["slope", "intercept","r_value", "p_value", "std_err"],
+                                columns=self.yearly_mean_values.columns)
 
+        data = trend_df.values
+        # 表格加载数据
+        # 设置行列，设置表头
+        tmp = trend_df.columns
+        tmp2 = [str(_) for _ in trend_df.index.tolist()]
+        self.TableWidget.setRowCount(len(data))
+        self.TableWidget.setColumnCount(len(data[0]))
+        self.TableWidget.setHorizontalHeaderLabels(tmp)
+        self.TableWidget.setVerticalHeaderLabels(tmp2)
+        # 表格加载内容
+        for row, form in enumerate(data):
+            for column, item in enumerate(form):
+                if math.isnan(item):
+                    self.TableWidget.setItem(row, column, QTableWidgetItem(""))
+                else:
+                    self.TableWidget.setItem(row, column, QTableWidgetItem(str(item)))
 
-
-
+        # 保存数据
+        path = QFileDialog.getSaveFileName(self, "保存文件", "./", ("结果(*.xlsx)"))
+        if path:
+            trend_df.to_excel(path[0])
 
     #突变分析
     def mutation_analysis(self):
         time_series = self.yearly_mean_values.index
+        df_k = []
+        df_lst = []
         for i in range(len(self.yearly_mean_values.columns)):
             year_runoff = self.yearly_mean_values.iloc[:,i].values
             k, UFk, UBkT = Kendall_change_point_detection(time_series, year_runoff)
             # print(k, UFk, UBkT)
             #返回三个列表
+            df_k.append(int(time_series[item]) for item in k)
+            df_lst.append(UFk)
+            df_lst.append(UBkT)
+        result_lst = pd.DataFrame(df_lst)
+        result_lst = result_lst.T
+        result_lst.index = self.yearly_mean_values.index
+        columns_lst = []
+        for item in self.yearly_mean_values.columns:
+            columns_lst.append(f"{item}_UFk")
+            columns_lst.append(f"{item}_UBk")
+        result_lst.columns = columns_lst
+        result_k = pd.DataFrame(df_k)
+        result_k = result_k.T
+        result_k.columns = self.yearly_mean_values.columns
 
+        data = result_k.values
+        # 表格加载数据
+        # 设置行列，设置表头
+        tmp = result_k.columns
+        tmp2 = [str(_) for _ in result_k.index.tolist()]
+        self.TableWidget.setRowCount(len(data))
+        self.TableWidget.setColumnCount(len(data[0]))
+        self.TableWidget.setHorizontalHeaderLabels(tmp)
+        self.TableWidget.setVerticalHeaderLabels(tmp2)
+        # 表格加载内容
+        for row, form in enumerate(data):
+            for column, item in enumerate(form):
+                if math.isnan(item):
+                    self.TableWidget.setItem(row, column, QTableWidgetItem(""))
+                else:
+                    self.TableWidget.setItem(row, column, QTableWidgetItem(str(int(item))))
 
+        # 保存数据
+        path = QFileDialog.getSaveFileName(self, "保存文件", "./", ("结果(*.xlsx)"))
+        if path:
+            # 创建Excel写入器对象
+            writer = pd.ExcelWriter('output.xlsx')
+            # 将第一个DataFrame保存为Sheet1
+            result_lst.to_excel(writer, sheet_name='Ufk_ubk', index=False)
+            # 将第二个DataFrame保存为Sheet2
+            result_k.to_excel(writer, sheet_name='突变年份', index=False)
+            # 关闭Excel写入器并保存文件
+            writer.save()
 
+    #年均趋势分析
+    def avg_trend_analysis(self):
 
+        time_series = self.df_avg.index
+        lst = []
+        for i in range(len(self.df_avg.columns)):
+            runoff_data = self.df_avg.iloc[:,i].values
+            slope, intercept, r_value, p_value, std_err = linear_regression(time_series, runoff_data)
+            lst.append([slope.round(5), intercept.round(5),r_value.round(5), p_value.round(5), std_err.round(5)])
+        trend_df = pd.DataFrame(lst,index=["slope", "intercept","r_value", "p_value", "std_err"],
+                                columns=self.df_avg.columns)
 
+        data = trend_df.values
+        # 表格加载数据
+        # 设置行列，设置表头
+        tmp = trend_df.columns
+        tmp2 = [str(_) for _ in trend_df.index.tolist()]
+        self.TableWidget.setRowCount(len(data))
+        self.TableWidget.setColumnCount(len(data[0]))
+        self.TableWidget.setHorizontalHeaderLabels(tmp)
+        self.TableWidget.setVerticalHeaderLabels(tmp2)
+        # 表格加载内容
+        for row, form in enumerate(data):
+            for column, item in enumerate(form):
+                if math.isnan(item):
+                    self.TableWidget.setItem(row, column, QTableWidgetItem(""))
+                else:
+                    self.TableWidget.setItem(row, column, QTableWidgetItem(str(item)))
 
+        # 保存数据
+        path = QFileDialog.getSaveFileName(self, "保存文件", "./", ("结果(*.xlsx)"))
+        if path:
+            trend_df.to_excel(path[0])
 
+    #年均突变分析
+    def avg_mutation_analysis(self):
+        time_series = self.df_avg.index
+        df_k = []
+        df_lst = []
+        for i in range(len(self.df_avg.columns)):
+            year_runoff = self.df_avg.iloc[:,i].values
+            k, UFk, UBkT = Kendall_change_point_detection(time_series, year_runoff)
+            # print(k, UFk, UBkT)
+            #返回三个列表
+            df_k.append(int(time_series[item]) for item in k)
+            df_lst.append(UFk)
+            df_lst.append(UBkT)
+        result_lst = pd.DataFrame(df_lst)
+        result_lst = result_lst.T
+        result_lst.index = self.df_avg.index
+        columns_lst = []
+        for item in self.df_avg.columns:
+            columns_lst.append(f"{item}_UFk")
+            columns_lst.append(f"{item}_UBk")
+        result_lst.columns = columns_lst
+        result_k = pd.DataFrame(df_k)
+        result_k = result_k.T
+        result_k.columns = self.df_avg.columns
+
+        data = result_k.values
+        # 表格加载数据
+        # 设置行列，设置表头
+        tmp = result_k.columns
+        tmp2 = [str(_) for _ in result_k.index.tolist()]
+        self.TableWidget.setRowCount(len(data))
+        self.TableWidget.setColumnCount(len(data[0]))
+        self.TableWidget.setHorizontalHeaderLabels(tmp)
+        self.TableWidget.setVerticalHeaderLabels(tmp2)
+        # 表格加载内容
+        for row, form in enumerate(data):
+            for column, item in enumerate(form):
+                if math.isnan(item):
+                    self.TableWidget.setItem(row, column, QTableWidgetItem(""))
+                else:
+                    self.TableWidget.setItem(row, column, QTableWidgetItem(str(int(item))))
+
+        # 保存数据
+        path = QFileDialog.getSaveFileName(self, "保存文件", "./", ("结果(*.xlsx)"))
+        if path:
+            # 创建Excel写入器对象
+            writer = pd.ExcelWriter('output.xlsx')
+            # 将第一个DataFrame保存为Sheet1
+            result_lst.to_excel(writer, sheet_name='Ufk_ubk', index=False)
+            # 将第二个DataFrame保存为Sheet2
+            result_k.to_excel(writer, sheet_name='突变年份', index=False)
+            # 关闭Excel写入器并保存文件
+            writer.save()
+
+    def showDialog(self):
+        title = '弹窗警告'
+        content = """数据输入索引无法转化为时间索引，请对时间输入进行手动调整"""
+        # w = MessageDialog(title, content, self)   # Win10 style message box
+        w = MessageBox(title, content, self)
+        if w.exec():
+            pass
+        else:
+            pass
 
     #联系作者
     def call_author(self):
